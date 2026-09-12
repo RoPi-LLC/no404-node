@@ -1,0 +1,15 @@
+# Normalise line endings: LF in the repository and on checkout, on every OS.
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Generated lockfile: keep, but do not spam diffs
+pnpm-lock.yaml -diff linguist-generated
+
+# Note: npm does NOT honour export-ignore. What goes into the published package
+# is the "files" whitelist in package.json; export-ignore only affects git archives.

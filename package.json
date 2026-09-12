@@ -1,0 +1,133 @@
+{
+  "name": "@no404/node",
+  "version": "1.0.0",
+  "description": "Real server-side 301/302 redirects for your 404s, matched against your live catalogue by no404. Express, Fastify, Hono and Next.js.",
+  "license": "MIT",
+  "author": "RoPi LLC",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "packageManager": "pnpm@11.1.3",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RoPi-LLC/no404-node.git"
+  },
+  "homepage": "https://www.no404.tr/en/docs#node",
+  "bugs": "https://github.com/RoPi-LLC/no404-node/issues",
+  "keywords": [
+    "404",
+    "redirect",
+    "301",
+    "seo",
+    "broken-links",
+    "express",
+    "fastify",
+    "hono",
+    "nextjs",
+    "middleware"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "no404": "./dist/cli.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./express": {
+      "import": "./dist/express.js",
+      "require": "./dist/express.cjs"
+    },
+    "./fastify": {
+      "import": "./dist/fastify.js",
+      "require": "./dist/fastify.cjs"
+    },
+    "./hono": {
+      "import": "./dist/hono.js",
+      "require": "./dist/hono.cjs"
+    },
+    "./next": {
+      "import": "./dist/next.js",
+      "require": "./dist/next.cjs"
+    },
+    "./next/proxy": {
+      "import": "./dist/next-proxy.js",
+      "require": "./dist/next-proxy.cjs"
+    },
+    "./next/pages": {
+      "import": "./dist/next-pages.js",
+      "require": "./dist/next-pages.cjs"
+    },
+    "./cache/redis": {
+      "import": "./dist/cache-redis.js",
+      "require": "./dist/cache-redis.cjs"
+    },
+    "./cache/kv": {
+      "import": "./dist/cache-kv.js",
+      "require": "./dist/cache-kv.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "express": "^4.18.0 || ^5.0.0",
+    "fastify": "^5.0.0",
+    "hono": "^4.0.0",
+    "next": "^15.0.0 || ^16.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
+    "@eslint/js": "10.0.1",
+    "@types/express": "5.0.6",
+    "@types/node": "22.20.2",
+    "eslint": "10.10.0",
+    "express": "5.2.1",
+    "fastify": "5.12.4",
+    "hono": "4.13.7",
+    "next": "16.3.5",
+    "publint": "0.3.24",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tsdown": "0.23.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.0"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check:pkg": "publint --strict && attw --pack . --profile node16",
+    "check:deps": "node scripts/assert-zero-deps.mjs",
+    "lint": "eslint .",
+    "smoke": "node scripts/smoke-runtimes.mjs",
+    "prepack": "pnpm build && pnpm check:deps"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

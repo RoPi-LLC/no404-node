@@ -1,0 +1,49 @@
+name: Publish
+
+# Runs when a version tag (v1.2.3) is pushed. npm trusted publishing (OIDC):
+# no npm token is stored anywhere; provenance is generated automatically.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1.
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm check:deps
+      - run: pnpm check:pkg
+      - run: node scripts/assert-tag-matches-version.mjs
+      # 1.0.0 is published by hand (trusted publishing can only be set up on an
+      # existing package); its tag must not turn this run red.
+      - name: Skip a version that is already on npm
+        id: existing
+        run: |
+          if npm view "@no404/node@${GITHUB_REF_NAME#v}" version >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::@no404/node@${GITHUB_REF_NAME#v} is already on npm — nothing to publish."
+          fi
+      - name: npm publish
+        if: steps.existing.outputs.skip != 'true'
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            npm publish --access public --tag next
+          else
+            npm publish --access public
+          fi

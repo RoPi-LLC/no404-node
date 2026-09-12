@@ -1,0 +1,58 @@
+# Internal documents (engineering plan, notes, test logs). NEVER published:
+# keep anything users or the public should not see in this folder.
+/_internal/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output — NOT tracked (unlike the PrestaShop repo's dist/): npm is the
+# distribution channel and provenance ties the published files to the CI build.
+/dist/
+*.tsbuildinfo
+
+# Test and tool caches
+/coverage/
+/.vitest/
+/.turbo/
+/.eslintcache
+/.cache/
+
+# Local environment (never commit secrets); .env.example stays tracked
+.env
+.env.*
+!.env.example
+
+# npm pack / local tarballs (smoke tests)
+*.tgz
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Example apps' framework output (examples/<fw>/)
+examples/**/.next/
+examples/**/.nuxt/
+examples/**/.output/
+examples/**/.svelte-kit/
+examples/**/.astro/
+examples/**/.wrangler/
+examples/**/.vercel/
+examples/**/dist/
+examples/**/build/
+examples/**/next-env.d.ts
+# Example apps install the packed tarball; their lockfiles pin a local file.
+examples/**/pnpm-lock.yaml
+examples/**/package-lock.json
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

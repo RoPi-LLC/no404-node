@@ -1,0 +1,15 @@
+{
+  "name": "no404-example-next-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "next build",
+    "start": "next start -p 3100"
+  },
+  "dependencies": {
+    "@no404/node": "file:./no404-node-1.0.0.tgz",
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}
