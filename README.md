@@ -195,7 +195,9 @@ dashboard (`redirectStatus` in the API response); `force301` overrides it.
 ## Deployment: use a shared cache on serverless
 
 Every answer is cached per path — including "no match" — so a dead URL costs
-one lookup per hour, not one per visit. The default cache lives in one
+one lookup per hour, not one per visit. Clicks from an ad or an AI assistant
+are the exception: they skip the cache so no404 counts each one (the cached
+answer is still used if no404 cannot be reached). The default cache lives in one
 process. On Vercel, AWS Lambda, Cloudflare Workers or several pods, every
 instance would ask again; use a shared store (the circuit breaker is shared
 with it):
@@ -227,6 +229,10 @@ To resolve a 404, the SDK sends no404:
 - the `Referer`, when there is one;
 - the **ad category** (`google`, `microsoft`, `meta`, `other`) when the URL
   carries an ad click — worked out locally; click IDs such as `gclid` are never sent;
+- the **AI-assistant category** (`chatgpt`, `claude`, `perplexity`, `gemini`,
+  `copilot`, `meta`, `other`) when the visitor came from one — worked out locally
+  from `utm_source` (`chatgpt.com`, `perplexity` …) or the referrer's host
+  (`chatgpt.com`, `claude.ai`, `perplexity.ai` …); the `utm_source` value itself is never sent;
 - the visitor's **IP truncated to its network** (`203.0.113.0`, `2001:db8:1c1c::`);
   private and reserved addresses are not sent at all;
 - a **visitor ID**: an HMAC-SHA256 of the full IP keyed with *your*

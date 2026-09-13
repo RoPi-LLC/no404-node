@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-13
+
+### Added
+
+- Recognises visitors arriving from AI assistants (ChatGPT, Claude, Perplexity, Gemini, Copilot…)
+  and reports only the category to no404. Detected locally from `utm_source` (exact values such
+  as `chatgpt.com`) or the referrer's host, and sent as `src=` (`chatgpt`, `claude`, `perplexity`,
+  `gemini`, `copilot`, `meta`, `other`) only when there is a match; the query string is still
+  never sent. New export: `detectAiSource(rawUrl, referrer)` and the `AiSource` type.
+
+### Changed
+
+- A click from an AI assistant skips the cache read, like an ad click, so no404 counts it; when
+  no404 cannot be reached the cached answer is still used.
+
+### Security
+
+- Trailing slashes in `baseUrl`, `siteUrl` and request paths are trimmed with a linear loop
+  instead of `/\/+$/`, which CodeQL flagged as a polynomial regular expression (ReDoS).
+
 ## [1.0.0] - 2026-09-13
 
 ### Added
@@ -28,5 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Node 22 / 24 / 26, ESLint, package checks (publint, arethetypeswrong, zero dependencies),
   Bun and Deno smoke tests of the built package, the CLI on Windows.
 
-[Unreleased]: https://github.com/RoPi-LLC/no404-node/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/RoPi-LLC/no404-node/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/RoPi-LLC/no404-node/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/RoPi-LLC/no404-node/releases/tag/v1.0.0

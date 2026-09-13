@@ -1,5 +1,6 @@
 import { VERSION } from "../version.js";
 import { detectAdCategory } from "./ad.js";
+import { detectAiSource } from "./ai.js";
 import { fnv1a32, sharedMemoryCache } from "./cache.js";
 import {
   API_KEY_PATTERN,
@@ -23,9 +24,10 @@ import {
   QUOTA_TTL,
   USER_AGENT_PREFIX,
   type AdCategory,
+  type AiSource,
 } from "./constants.js";
 import { parseIp, truncateIp } from "./ip.js";
-import { byteLength, normalizePath } from "./path.js";
+import { byteLength, normalizePath, trimTrailingSlashes } from "./path.js";
 import type {
   BreakerState,
   CacheAdapter,
@@ -47,6 +49,12 @@ type Transport =
   | { ok: false; error: string };
 
 type Lookup = { result: LookupResult; cached: boolean } | { result: null; reason: SkipReason };
+
+/** Traffic categories worked out locally and sent as `ad=` / `src=`. Never the raw query. */
+interface Hints {
+  ad: AdCategory | null;
+  ai: AiSource | null;
+}
 
 // eslint-disable-next-line no-control-regex -- header-injection guard: control characters are exactly what it looks for
 const CONTROL_CHARS = /[\x00-\x1F\x7F]/;
@@ -105,8 +113,8 @@ export class No404Client {
 
     this.#apiKey = (options.apiKey ?? env.NO404_API_KEY ?? "").trim();
     this.#keyFormatValid = API_KEY_PATTERN.test(this.#apiKey);
-    this.apiBase = (options.baseUrl ?? env.NO404_BASE_URL ?? DEFAULT_BASE_URL).trim().replace(/\/+$/, "");
-    this.siteUrl = (options.siteUrl ?? env.NO404_SITE_URL ?? "").trim().replace(/\/+$/, "");
+    this.apiBase = trimTrailingSlashes((options.baseUrl ?? env.NO404_BASE_URL ?? DEFAULT_BASE_URL).trim());
+    this.siteUrl = trimTrailingSlashes((options.siteUrl ?? env.NO404_SITE_URL ?? "").trim());
     this.#disabled = options.disabled ?? /^(1|true|yes|on)$/i.test(env.NO404_DISABLED ?? "");
     this.#debug = options.debug ?? /^(1|true|yes|on)$/i.test(env.NO404_DEBUG ?? "");
     this.#timeoutMs = clamp(options.timeoutMs, MIN_TIMEOUT_MS, MAX_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
@@ -151,7 +159,8 @@ export class No404Client {
    *
    * AD CLICKS: when the URL carries an ad click (gclid, paid utm…), the cache is
    * NOT read — each paid click is counted by no404. If no404 cannot be reached,
-   * the cached answer is still used.
+   * the cached answer is still used. A click from an AI assistant (ChatGPT,
+   * Claude, Perplexity… — `utm_source` or the referrer) is treated the same way.
    */
   async resolve(input: ResolveInput): Promise<ResolveResult> {
     const started = Date.now();
@@ -192,7 +201,10 @@ export class No404Client {
     }
     if (this.isIgnoredPath(path)) return { decision: "none", reason: "blacklist", cached: false, path };
 
-    const lookup = await this.#lookup(path, input, detectAdCategory(input.url));
+    const lookup = await this.#lookup(path, input, {
+      ad: detectAdCategory(input.url),
+      ai: detectAiSource(input.url, input.referrer),
+    });
     if (lookup.result === null) return { decision: "none", reason: lookup.reason, cached: false, path };
 
     const { result, cached } = lookup;
@@ -213,20 +225,22 @@ export class No404Client {
     };
   }
 
-  async #lookup(path: string, input: ResolveInput, ad: AdCategory | null): Promise<Lookup> {
+  async #lookup(path: string, input: ResolveInput, hints: Hints): Promise<Lookup> {
     const key = `${this.#scope}:${path}`;
     const stored = await this.#cacheGet(key);
     const cached = isLookupResult(stored) ? stored : null;
-    if (cached !== null && ad === null) return { result: cached, cached: true };
+    // Ad and AI-assistant clicks are counted by no404: the cache is not read for them.
+    const counted = hints.ad !== null || hints.ai !== null;
+    if (cached !== null && !counted) return { result: cached, cached: true };
 
     // Circuit breaker: while the API is unreachable or out of quota, do not ask on every 404.
     if ((await this.#cacheGet(this.#breakerKey())) != null) {
       return cached !== null ? { result: cached, cached: true } : { result: null, reason: "circuit-open" };
     }
 
-    const fresh = await this.#fetchOnce(`${this.apiBase}|${key}|${ad ?? ""}`, async () => {
+    const fresh = await this.#fetchOnce(`${this.apiBase}|${key}|${hints.ad ?? ""}|${hints.ai ?? ""}`, async () => {
       const response = await this.#request(
-        this.#buildUrl(path, input.referrer, ad),
+        this.#buildUrl(path, input.referrer, hints),
         this.#timeoutMs,
         await this.#requestHeaders(input.adapter, input.visitor),
       );
@@ -234,7 +248,7 @@ export class No404Client {
     });
     if (fresh !== null) return { result: fresh, cached: false };
 
-    // An ad click that could not be answered falls back to what we knew.
+    // An ad or AI click that could not be answered falls back to what we knew.
     return cached !== null ? { result: cached, cached: true } : { result: null, reason: "lookup-failed" };
   }
 
@@ -378,6 +392,10 @@ export class No404Client {
     return detectAdCategory(rawUrl);
   }
 
+  detectAiSource(rawUrl: string, referrer?: string | null): AiSource | null {
+    return detectAiSource(rawUrl, referrer);
+  }
+
   /** The SDK's User-Agent: `no404-node/<version> (<adapter>); <siteUrl>`. */
   userAgent(adapter = "core"): string {
     const name = adapter.replace(/[^a-z0-9-]/gi, "") || "core";
@@ -469,7 +487,7 @@ export class No404Client {
     if (!this.#keyFormatValid) return { ...out, code: "invalid_key", detail: "The API key has an invalid format." };
 
     const response = await this.#request(
-      this.#buildUrl(normalizePath(path) || "/", null, null),
+      this.#buildUrl(normalizePath(path) || "/", null, { ad: null, ai: null }),
       Math.max(PING_TIMEOUT_MS, this.#timeoutMs),
       await this.#requestHeaders("ping", undefined),
     );
@@ -511,11 +529,12 @@ export class No404Client {
    * The request URL. The API key is NOT part of it: it travels in the
    * Authorization header — a key in a URL ends up in proxy and CDN logs.
    */
-  #buildUrl(path: string, referrer: string | null | undefined, ad: AdCategory | null): string {
+  #buildUrl(path: string, referrer: string | null | undefined, hints: Hints): string {
     let query = `path=${encodeURIComponent(path)}`;
     const ref = (referrer ?? "").trim();
     if (ref !== "") query += `&ref=${encodeURIComponent(ref.slice(0, MAX_PATH_LENGTH))}`;
-    if (ad !== null) query += `&ad=${ad}`;
+    if (hints.ad !== null) query += `&ad=${hints.ad}`;
+    if (hints.ai !== null) query += `&src=${hints.ai}`;
     return `${this.apiBase}/api/v1/resolve?${query}`;
   }
 

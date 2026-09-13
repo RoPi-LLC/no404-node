@@ -35,7 +35,18 @@ export function normalizePath(raw: unknown): string {
   if (!value.startsWith("/")) value = `/${value}`;
 
   value = value.replace(/\/{2,}/g, "/");
-  if (value.length > 1) value = value.replace(/\/+$/, "");
+  if (value.length > 1) value = trimTrailingSlashes(value);
 
   return value === "" ? "/" : value;
+}
+
+/**
+ * Removes every trailing "/". A loop instead of `/\/+$/`: that regex is
+ * quadratic on a long run of slashes followed by another character (CodeQL
+ * js/polynomial-redos), and these values come from requests and config.
+ */
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* "/" */) end--;
+  return end === value.length ? value : value.slice(0, end);
 }

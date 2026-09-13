@@ -46,6 +46,15 @@ describe("Express", () => {
     expect(api.calls).toHaveLength(0);
   });
 
+  it("reports a click from an AI assistant as src=, never the utm_source", async () => {
+    const api = fakeFetch([json(HIT)]);
+    const base = await start(api);
+    const res = await fetch(`${base}/old-product?utm_source=chatgpt.com`, { redirect: "manual" });
+    expect(res.status).toBe(301);
+    expect(api.calls[0]?.url).toContain("&src=chatgpt");
+    expect(api.calls[0]?.url).not.toContain("utm_source");
+  });
+
   it("turns a match into a real 301 and forwards the visitor", async () => {
     const api = fakeFetch([json(HIT)]);
     const base = await start(api);

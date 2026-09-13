@@ -51,6 +51,18 @@ describe("Next.js App Router", () => {
     expect(api.calls[0]?.headers["User-Agent"]).toContain("(next)");
   });
 
+  it("sends src= from the proxied URL's utm_source or the Referer", async () => {
+    const api = fakeFetch([json(HIT), json(HIT)]);
+    const client = makeClient(api);
+    mocks.headers = new Headers({ "x-no404-url": "/old-product?utm_source=chatgpt.com" });
+    await expect(resolveNotFound(client)).rejects.toMatchObject({ kind: "permanent" });
+    mocks.headers = new Headers({ "x-no404-url": "/old-product", referer: "https://claude.ai/chat/1" });
+    await expect(resolveNotFound(client)).rejects.toMatchObject({ kind: "permanent" });
+    expect(api.calls[0]?.url).toContain("&src=chatgpt");
+    expect(api.calls[0]?.url).not.toContain("utm_source");
+    expect(api.calls[1]?.url).toContain("&src=claude");
+  });
+
   it("returns quietly without the proxy header or a match", async () => {
     const api = fakeFetch();
     mocks.headers = new Headers();

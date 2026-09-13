@@ -1,6 +1,14 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { createNo404, MemoryCache, VERSION, type CacheAdapter, type No404Error } from "../src/index.js";
+import {
+  createNo404,
+  detectAiSource,
+  MemoryCache,
+  VERSION,
+  type CacheAdapter,
+  type No404Error,
+} from "../src/index.js";
+import { trimTrailingSlashes } from "../src/core/path.js";
 import { fakeFetch, HIT, json, makeClient, NONE } from "./helpers.js";
 
 // Ported one to one from the WordPress plugin's tests/test-core.php, so every
@@ -21,6 +29,26 @@ describe("normalizePath (must match cleanPath on the server)", () => {
     ["https://store.example?q=1", "/"],
   ])("%j → %j", (input, expected) => {
     expect(c.normalizePath(input)).toBe(expected);
+  });
+});
+
+describe("trimTrailingSlashes (no polynomial regex)", () => {
+  it.each([
+    ["https://no404.app/", "https://no404.app"],
+    ["https://no404.app///", "https://no404.app"],
+    ["/product/", "/product"],
+    ["/", ""],
+    ["", ""],
+    ["/a/b", "/a/b"],
+  ])("%j → %j", (input, expected) => {
+    expect(trimTrailingSlashes(input)).toBe(expected);
+  });
+
+  it("stays linear on a long run of slashes followed by another character", () => {
+    const input = `${"/".repeat(200_000)}x`;
+    const started = performance.now();
+    expect(trimTrailingSlashes(input)).toBe(input);
+    expect(performance.now() - started).toBeLessThan(50);
   });
 });
 
@@ -415,6 +443,84 @@ describe("an ad click skips the cache READ and sends only the category", () => {
     const c = makeClient(api);
     await c.resolve({ url: "/old-product" });
     const r = await c.resolve({ url: "/old-product?utm_medium=paid&utm_source=facebook" });
+    expect(r).toMatchObject({ decision: "redirect", url: "https://store.example/new", cached: true });
+  });
+});
+
+describe("detectAiSource (only the category leaves the site)", () => {
+  it.each<[string, string | null, string | null]>([
+    ["/eer21?utm_source=chatgpt.com", null, "chatgpt"],
+    ["/x?utm_medium=referral&utm_source=ChatGPT.com", null, "chatgpt"],
+    ["/x", "https://chatgpt.com/", "chatgpt"],
+    ["/x", "chatgpt.com/c/1", "chatgpt"],
+    ["/x", "https://www.perplexity.ai/search?q=a", "perplexity"],
+    ["/x", "https://claude.ai/chat/1", "claude"],
+    ["/x", "https://gemini.google.com/app", "gemini"],
+    ["/x", "https://copilot.microsoft.com/", "copilot"],
+    ["/x?utm_source=perplexity", "https://www.google.com/", "perplexity"],
+    ["/x", "https://www.google.com/", null],
+    ["/x", "https://evilchatgpt.com/", null],
+    ["/x", "https://chatgpt.com.evil.net/", null],
+    ["/x?utm_source=chatbot-kampanya", null, null],
+    ["/x?utm_source=constructor", null, null],
+    ["/x?utm_source=__proto__", null, null],
+    ["", "about:blank", null],
+  ])("%s · %s → %s", (url, referrer, expected) => {
+    expect(detectAiSource(url, referrer)).toBe(expected);
+  });
+
+  it("more hosts and utm values", () => {
+    expect(detectAiSource("/x", "https://m.chat.openai.com/")).toBe("chatgpt");
+    expect(detectAiSource("/x", "https://chatgpt.com./")).toBe("chatgpt");
+    expect(detectAiSource("/x", "https://www.meta.ai/")).toBe("meta");
+    expect(detectAiSource("/x", "https://poe.com/")).toBe("other");
+    expect(detectAiSource("/x", "ftp://chatgpt.com/")).toBeNull();
+    expect(detectAiSource("/x?utm_source=grok&utm_source=claude")).toBe("claude");
+    expect(detectAiSource("/x#utm_source=chatgpt.com")).toBeNull();
+    expect(makeClient(fakeFetch()).detectAiSource("/x?utm_source=gemini")).toBe("gemini");
+  });
+});
+
+describe("an AI-assistant click skips the cache READ and sends only the category", () => {
+  it("sends src= when detected and never the raw utm_source", async () => {
+    const api = fakeFetch([json(HIT), json(HIT), json(HIT)]);
+    const c = makeClient(api);
+    await c.resolve({ url: "/old-product" });
+    expect(api.calls[0]?.url).not.toContain("src=");
+
+    await c.resolve({ url: "/old-product?utm_source=chatgpt.com" });
+    expect(api.calls).toHaveLength(2);
+    expect(api.calls[1]?.url).toContain("&src=chatgpt");
+    expect(api.calls[1]?.url).not.toContain("utm_source");
+    expect(api.calls[1]?.url).not.toContain("chatgpt.com");
+
+    await c.resolve({ url: "/old-product", referrer: "https://claude.ai/chat/1" });
+    expect(api.calls).toHaveLength(3);
+    expect(api.calls[2]?.url).toContain("&src=claude");
+
+    // Organic again: answered from the cache.
+    await c.resolve({ url: "/old-product", referrer: "https://www.google.com/" });
+    expect(api.calls).toHaveLength(3);
+  });
+
+  it("sends no src= for ordinary traffic", async () => {
+    const api = fakeFetch();
+    await makeClient(api).resolve({ url: "/x?utm_source=newsletter", referrer: "https://www.google.com/" });
+    expect(api.calls[0]?.url).not.toContain("src=");
+  });
+
+  it("sends ad= and src= together for a paid campaign from an assistant", async () => {
+    const api = fakeFetch();
+    await makeClient(api).resolve({ url: "/x?utm_medium=cpc&utm_source=chatgpt.com" });
+    expect(api.calls[0]?.url).toContain("&ad=other&src=chatgpt");
+  });
+
+  it("falls back to the cache when no404 is down", async () => {
+    const api = fakeFetch([json(HIT), new TypeError("timeout")]);
+    const c = makeClient(api);
+    await c.resolve({ url: "/old-product" });
+    const r = await c.resolve({ url: "/old-product", referrer: "https://www.perplexity.ai/" });
+    expect(api.calls).toHaveLength(2);
     expect(r).toMatchObject({ decision: "redirect", url: "https://store.example/new", cached: true });
   });
 });

@@ -11,6 +11,10 @@ export const CACHE_SCHEMA = "v1";
 export const AD_CATEGORIES = ["google", "microsoft", "meta", "other"] as const;
 export type AdCategory = (typeof AD_CATEGORIES)[number];
 
+/** AI-assistant categories the no404 API accepts in `src=` (it drops anything else). */
+export const AI_SOURCES = ["chatgpt", "claude", "perplexity", "gemini", "copilot", "meta", "other"] as const;
+export type AiSource = (typeof AI_SOURCES)[number];
+
 /** `utm_medium` values that mark paid traffic (lower case) — same list as the server. */
 export const PAID_MEDIUMS: ReadonlySet<string> = new Set([
   "cpc",

@@ -1,6 +1,6 @@
 {
   "name": "@no404/node",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Real server-side 301/302 redirects for your 404s, matched against your live catalogue by no404. Express, Fastify, Hono and Next.js.",
   "license": "MIT",
   "author": "RoPi LLC",

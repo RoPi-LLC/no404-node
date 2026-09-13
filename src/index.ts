@@ -1,10 +1,11 @@
 export { createNo404, No404Client } from "./core/client.js";
 export { MemoryCache, memoryCache, type MemoryCacheOptions } from "./core/cache.js";
 export { detectAdCategory } from "./core/ad.js";
+export { detectAiSource } from "./core/ai.js";
 export { normalizePath } from "./core/path.js";
 export { isPublicIp, truncateIp } from "./core/ip.js";
 export { nodeHeaderGetter, visitorFromHeaders, type HeaderGetter } from "./core/request.js";
-export { REDIRECT_BY, USER_AGENT_PREFIX, type AdCategory } from "./core/constants.js";
+export { REDIRECT_BY, USER_AGENT_PREFIX, type AdCategory, type AiSource } from "./core/constants.js";
 export { VERSION } from "./version.js";
 export type {
   BreakerState,
