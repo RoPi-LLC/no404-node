@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-13
+
 ### Added
 
 - First release: server-side 301/302 redirects for your application's 404s,
@@ -26,4 +28,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Node 22 / 24 / 26, ESLint, package checks (publint, arethetypeswrong, zero dependencies),
   Bun and Deno smoke tests of the built package, the CLI on Windows.
 
-[Unreleased]: https://github.com/RoPi-LLC/no404-node/commits/main
+[Unreleased]: https://github.com/RoPi-LLC/no404-node/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/RoPi-LLC/no404-node/releases/tag/v1.0.0
