@@ -34,8 +34,8 @@ describe("normalizePath (must match cleanPath on the server)", () => {
 
 describe("trimTrailingSlashes (no polynomial regex)", () => {
   it.each([
-    ["https://no404.app/", "https://no404.app"],
-    ["https://no404.app///", "https://no404.app"],
+    ["https://www.no404.tr/", "https://www.no404.tr"],
+    ["https://www.no404.tr///", "https://www.no404.tr"],
     ["/product/", "/product"],
     ["/", ""],
     ["", ""],
